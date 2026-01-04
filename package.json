@@ -1,0 +1,14 @@
+{
+  "name": "voidstriker",
+  "version": "1.0.0",
+  "description": "VOID STRIKER static bundle with simple save API",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
