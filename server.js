@@ -13,6 +13,11 @@ const SAVE_FILE = path.join(__dirname, 'save.json');
 app.use(express.json());
 app.use(express.static(__dirname));
 
+// Root route - serves the game
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'skyforceclone.html'));
+});
+
 app.get('/api/save', (req, res) => {
   try {
     if (!fs.existsSync(SAVE_FILE)) {
