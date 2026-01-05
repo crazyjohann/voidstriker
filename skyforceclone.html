@@ -255,6 +255,7 @@ let gameState = 'MENU';
 let coinsEarned = 0, combo = 1, comboTimer = 0, frameCount = 0, shake = 0;
 let burstEnergy = 100, isOverheated = false;
 let armorFlash = 0;
+let lastTime = 0, deltaTime = 0;
 
 // Parallax background layers
 let stars = [], nebulae = [], bgStarsFar = [];
@@ -368,6 +369,8 @@ class Player {
         this.powerupTimer = 0;
         this.powerupDuration = 600;
         this.siphonCounter = 0;
+        this.moveSpeed = 400; // pixels per second
+        this.rotationSpeed = 3; // rotation speed multiplier
         // Ship visual bounds to prevent clipping
         this.visualWidth = (saveData.currentShip === 'titan' || saveData.currentShip === 'aegis') ? 50 : 45;
     }
@@ -399,13 +402,16 @@ class Player {
     }
     update() {
         const stats = SHIPS[saveData.currentShip];
-        const speed = stats.speed + (saveData.upgrades.engine * 0.5);
+        const speed = (stats.speed + (saveData.upgrades.engine * 0.5)) * 30; // Base speed multiplier
+        const moveAmount = speed * deltaTime;
+        
         let moveX = 0;
         if (keys['ArrowLeft'] || keys['KeyA']) moveX -= 1;
         if (keys['ArrowRight'] || keys['KeyD']) moveX += 1;
-        this.x += moveX * speed;
-        if (keys['ArrowUp'] || keys['KeyW']) this.y -= speed;
-        if (keys['ArrowDown'] || keys['KeyS']) this.y += speed;
+        this.x += moveX * moveAmount;
+        
+        if (keys['ArrowUp'] || keys['KeyW']) this.y -= moveAmount;
+        if (keys['ArrowDown'] || keys['KeyS']) this.y += moveAmount;
         
         this.targetBank = moveX * 0.35; 
         const bankSmoothness = 0.12; 
@@ -1017,7 +1023,16 @@ function endGame() {
     document.getElementById('stats-summary').innerHTML = `Collected: 🪙 ${coinsEarned.toLocaleString()}<br>Bank Total: 🪙 ${saveData.gold.toLocaleString()}`;
 }
 
-function loop() { update(); draw(); requestAnimationFrame(loop); }
+function loop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    deltaTime = (timestamp - lastTime) / 1000; // Convert to seconds
+    deltaTime = Math.min(deltaTime, 0.1); // Cap delta time to prevent large jumps
+    lastTime = timestamp;
+    
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
 
 async function boot() {
     await loadSaveData();
