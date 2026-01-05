@@ -407,7 +407,7 @@ class Player {
     }
     update() {
         const stats = SHIPS[saveData.currentShip];
-        const speed = (stats.speed + (saveData.upgrades.engine * 0.5)) * 25; // Slightly reduced speed multiplier
+        const speed = (stats.speed + (saveData.upgrades.engine * 0.5)) * 18; // Further reduced speed multiplier
         const moveAmount = speed * deltaTime;
         
         let moveX = 0;
