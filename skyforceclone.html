@@ -422,28 +422,31 @@ class Player {
         this.x = Math.max(edgeMargin, Math.min(WIDTH - edgeMargin, this.x));
         this.y = Math.max(80, Math.min(HEIGHT - 80, this.y));
         
-        this.fireTimer++;
-
         const isZenith = saveData.currentShip === 'zenith';
         const attemptingBurst = keys['Space'] && !isOverheated;
         
-        // FASTER BASE FIRE RATE: Decreased floor from 12 to 8, decreased cooldown per upgrade
-        let rate = Math.max(1, 8 - saveData.upgrades.guns * 0.6);
-        if (isZenith || this.activePowerup === 'RAPID') rate = 1.5;
-
+        // Convert fire rate to shots per second and use delta time
+        let shotsPerSecond = 10 + (saveData.upgrades.guns * 1.5); // Base 10 shots/sec + upgrades
+        if (isZenith || this.activePowerup === 'RAPID') shotsPerSecond = 30; // Faster firing in rapid fire mode
+        
+        const shotCooldown = 1 / shotsPerSecond; // Time between shots in seconds
+        
         if (attemptingBurst && burstEnergy > 0) {
-            rate = Math.max(1, Math.floor(rate / 3));
-            let cost = 0.6 / (1 + saveData.upgrades.burstCapacity * 0.1);
-            burstEnergy -= cost;
+            // Triple fire rate when bursting
+            this.fireTimer += deltaTime * 3;
+            let cost = 10 * deltaTime / (1 + saveData.upgrades.burstCapacity * 0.1);
+            burstEnergy = Math.max(0, burstEnergy - cost);
             if (burstEnergy <= 0) isOverheated = true;
         } else {
-            burstEnergy = Math.min(100, burstEnergy + 0.4);
+            this.fireTimer += deltaTime;
+            burstEnergy = Math.min(100, burstEnergy + 15 * deltaTime);
             if (isOverheated && burstEnergy >= 40) isOverheated = false;
         }
 
-        if (this.fireTimer >= rate) {
+        // Shoot if enough time has passed
+        while (this.fireTimer >= shotCooldown) {
             this.shoot(attemptingBurst);
-            this.fireTimer = 0;
+            this.fireTimer -= shotCooldown;
         }
 
         if (this.activePowerup) {
@@ -537,13 +540,20 @@ class Player {
 class Bullet {
     constructor(x, y, isBurst, dmg, angleOffset = 0, color = '#00d2ff', homing = false) {
         this.x = x; this.y = y; this.isBurst = isBurst; this.dmg = dmg;
-        this.vx = angleOffset * 10; this.vy = -25;
+        this.speed = 400; // pixels per second
+        this.angleOffset = angleOffset * 0.5; // Reduce angle offset for better control
+        this.baseVx = this.angleOffset * this.speed * 0.1;
+        this.baseVy = -this.speed * 0.1;
+        this.vx = this.baseVx;
+        this.vy = this.baseVy;
         this.color = color;
         this.homing = homing;
         this.radius = 6;
         this.active = true;
     }
     update() {
+        const baseSpeed = this.speed * deltaTime;
+        
         if (this.homing) {
             let target = null;
             let minDistSq = 200000;
@@ -554,18 +564,35 @@ class Bullet {
                     target = e;
                 }
             });
+            
             if (target) {
                 let angle = Math.atan2(target.y - this.y, target.x - this.x);
-                this.vx += Math.cos(angle) * 1.5;
-                this.vy += Math.sin(angle) * 1.5;
-                let mag = Math.sqrt(this.vx**2 + this.vy**2);
+                // Smooth homing with delta time
+                const turnRate = 2.5 * deltaTime;
+                const targetVx = Math.cos(angle) * baseSpeed;
+                const targetVy = Math.sin(angle) * baseSpeed;
+                this.vx += (targetVx - this.vx) * turnRate;
+                this.vy += (targetVy - this.vy) * turnRate;
+                
+                // Normalize speed
+                const mag = Math.sqrt(this.vx**2 + this.vy**2);
                 if (mag > 0) {
-                    this.vx = (this.vx / mag) * 22;
-                    this.vy = (this.vy / mag) * 22;
+                    this.vx = (this.vx / mag) * baseSpeed * 1.2;
+                    this.vy = (this.vy / mag) * baseSpeed * 1.2;
                 }
+            } else {
+                // Maintain base velocity when no target
+                this.vx = this.baseVx * deltaTime * 60;
+                this.vy = this.baseVy * deltaTime * 60;
             }
+        } else {
+            // Non-homing bullets use constant velocity with delta time
+            this.vx = this.baseVx * deltaTime * 60;
+            this.vy = this.baseVy * deltaTime * 60;
         }
-        this.x += this.vx; this.y += this.vy; 
+        
+        this.x += this.vx;
+        this.y += this.vy; 
     }
     draw() {
         ctx.fillStyle = this.isBurst ? '#ffc400' : this.color;
