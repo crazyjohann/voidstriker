@@ -390,6 +390,11 @@ class Player {
         this.powerupTimer = this.powerupDuration;
         document.getElementById('slot-icon').innerText = '';
         document.getElementById('pwr-slot').classList.remove('ready');
+        
+        // Visual feedback for powerup activation
+        for (let i = 0; i < 20; i++) {
+            particles.push(new Particle(this.x, this.y, POWERUP_TYPES[this.activePowerup].color));
+        }
     }
     takeDamage(amt) {
         const ship = saveData.currentShip;
@@ -402,7 +407,7 @@ class Player {
     }
     update() {
         const stats = SHIPS[saveData.currentShip];
-        const speed = (stats.speed + (saveData.upgrades.engine * 0.5)) * 30; // Base speed multiplier
+        const speed = (stats.speed + (saveData.upgrades.engine * 0.5)) * 25; // Slightly reduced speed multiplier
         const moveAmount = speed * deltaTime;
         
         let moveX = 0;
@@ -424,10 +429,11 @@ class Player {
         
         const isZenith = saveData.currentShip === 'zenith';
         const attemptingBurst = keys['Space'] && !isOverheated;
+        const attemptingPowerup = (keys['ShiftLeft'] || keys['ShiftRight']) && this.storedPowerup;
         
         // Convert fire rate to shots per second and use delta time
-        let shotsPerSecond = 10 + (saveData.upgrades.guns * 1.5); // Base 10 shots/sec + upgrades
-        if (isZenith || this.activePowerup === 'RAPID') shotsPerSecond = 30; // Faster firing in rapid fire mode
+        let shotsPerSecond = 6 + (saveData.upgrades.guns * 1.2); // Reduced base rate and upgrade scaling
+        if (isZenith || this.activePowerup === 'RAPID') shotsPerSecond = 20; // Slightly faster in rapid fire mode
         
         const shotCooldown = 1 / shotsPerSecond; // Time between shots in seconds
         
@@ -558,6 +564,7 @@ class Bullet {
             let target = null;
             let minDistSq = 200000;
             enemies.forEach(e => {
+                if (!e.active) return;
                 let dSq = (e.x - this.x)**2 + (e.y - this.y)**2;
                 if (dSq < minDistSq) {
                     minDistSq = dSq;
@@ -666,7 +673,9 @@ class Enemy {
     constructor(x, y, type = 'INTERCEPTOR') {
         this.x = x; this.y = y; this.type = type; this.isBoss = type === 'BOSS';
         this.hp = this.isBoss ? 300 : (type === 'HEAVY' ? 45 : 12);
-        this.maxHp = this.hp; this.speed = this.isBoss ? 0.6 : (type === 'HEAVY' ? 1.5 : 3.5);
+        this.maxHp = this.hp; 
+        // Reduced base speeds by ~20%
+        this.speed = this.isBoss ? 0.5 : (type === 'HEAVY' ? 1.2 : 2.8);
         this.hitFlash = 0; this.angle = 0; this.active = true;
         this.radius = this.isBoss ? 100 : (type === 'HEAVY' ? 40 : 25);
         this.pattern = Math.random() < 0.3 ? 'WAVE' : (Math.random() < 0.3 ? 'DIAGONAL' : 'STRAIGHT');
@@ -675,14 +684,15 @@ class Enemy {
         this.fireTimer = Math.floor(Math.random() * (this.isBoss ? 15 : (this.type === 'HEAVY' ? 45 : 70)));
     }
     update() {
+        const baseSpeed = this.speed * deltaTime * 50; // Make movement frame-rate independent
         if (this.pattern === 'WAVE') {
-            this.y += this.speed;
-            this.x = this.startX + Math.sin(this.y / 60 + this.seed) * 80;
+            this.y += baseSpeed;
+            this.x = this.startX + Math.sin(this.y / 100 + this.seed) * 80; // Slower wave pattern
         } else if (this.pattern === 'DIAGONAL') {
-            this.y += this.speed;
-            this.x += Math.sin(this.seed) * 2;
+            this.y += baseSpeed;
+            this.x += Math.sin(this.seed) * 1.5 * deltaTime * 50; // Smoother diagonal movement
         } else {
-            this.y += this.speed;
+            this.y += baseSpeed;
         }
 
         if (this.isBoss && this.y > 150) {
